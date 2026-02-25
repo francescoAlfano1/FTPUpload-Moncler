@@ -1,0 +1,56 @@
+' ---------------------------------------------------------------------------
+' Example function for uploading a file via SFTP using WinSCP.
+' This version is sanitized for public repositories.
+' No real hostnames, credentials, or business logic.
+' ---------------------------------------------------------------------------
+
+Imports WinSCP
+
+Public Class FtpUploader
+
+  Private ReadOnly _config As IFtpConfig
+  Private ReadOnly _logger As ILogger
+
+  Public Sub New(config As IFtpConfig, logger As ILogger)
+    _config = config
+    _logger = logger
+  End Sub
+
+  Public Function UploadFile(localFilePath As String) As Boolean
+    Dim sessionOptions As New SessionOptions()
+
+    Try
+      ' Load configuration from an injected interface (safe for public repos)
+      sessionOptions.Protocol = Protocol.Sftp
+      sessionOptions.HostName = _config.HostName
+      sessionOptions.PortNumber = _config.Port
+      sessionOptions.UserName = _config.UserName
+      sessionOptions.Password = _config.Password
+      sessionOptions.SshHostKeyFingerprint = _config.HostKeyFingerprint
+
+      Using session As New Session()
+        session.Open(sessionOptions)
+
+        Dim transferOptions As New TransferOptions() With {
+          .TransferMode = TransferMode.Binary
+        }
+
+        Dim result As TransferOperationResult =
+          session.PutFiles(localFilePath, _config.RemotePath, False, transferOptions)
+
+        result.Check()
+
+        For Each transfer As TransferEventArgs In result.Transfers
+          _logger.Info($"Upload of {transfer.FileName} succeeded.")
+        Next
+      End Using
+
+      Return True
+
+    Catch ex As Exception
+      _logger.Error("Error during SFTP upload: " & ex.Message)
+      Return False
+    End Try
+  End Function
+
+End Class
